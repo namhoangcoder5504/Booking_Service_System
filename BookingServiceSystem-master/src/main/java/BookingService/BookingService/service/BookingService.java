@@ -103,8 +103,36 @@ public class BookingService {
 //        Booking updatedBooking = bookingRepository.save(existingBooking);
 //        return bookingMapper.toResponse(updatedBooking);
 //    }
+//public BookingResponse createBooking(BookingRequest request) {
+//    // 1) Lấy email user đăng nhập
+//    var authentication = SecurityContextHolder.getContext().getAuthentication();
+//    String currentUserEmail = authentication.getName();
+//
+//    // 2) Tìm user (customer) theo email
+//    User customer = userRepository.findByEmail(currentUserEmail)
+//            .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
+//
+//    // 3) Tìm specialist
+//    User specialist = userRepository.findById(request.getSpecialistId())
+//            .orElseThrow(() -> new AppException(ErrorCode.SKIN_THERAPIST_NOT_EXISTED));
+//
+//    // 4) Map request -> Booking
+//    Booking booking = bookingMapper.toEntity(request);
+//
+//    // 5) Gán user
+//    bookingMapper.setUserEntities(booking, customer, specialist);
+//
+//    // 6) Luôn gán PENDING khi user tạo mới
+//    booking.setStatus(BookingStatus.PENDING);
+//    booking.setCreatedAt(LocalDateTime.now());
+//    booking.setUpdatedAt(LocalDateTime.now());
+//
+//    // 7) Lưu
+//    Booking savedBooking = bookingRepository.save(booking);
+//    return bookingMapper.toResponse(savedBooking);
+//}
 public BookingResponse createBooking(BookingRequest request) {
-    // 1) Lấy email user đăng nhập
+    // 1) Lấy email user đang đăng nhập
     var authentication = SecurityContextHolder.getContext().getAuthentication();
     String currentUserEmail = authentication.getName();
 
@@ -112,25 +140,36 @@ public BookingResponse createBooking(BookingRequest request) {
     User customer = userRepository.findByEmail(currentUserEmail)
             .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
 
-    // 3) Tìm specialist
+    // 3) Tìm specialist theo specialistId
     User specialist = userRepository.findById(request.getSpecialistId())
             .orElseThrow(() -> new AppException(ErrorCode.SKIN_THERAPIST_NOT_EXISTED));
 
-    // 4) Map request -> Booking
-    Booking booking = bookingMapper.toEntity(request);
+    // 4) Lấy danh sách ServiceEntity từ serviceIds
+    List<ServiceEntity> services = serviceRepository.findAllById(request.getServiceIds());
+    if (services.isEmpty()) {
+        throw new AppException(ErrorCode.SERVICE_NOT_EXISTED);
+    }
 
-    // 5) Gán user
+    // 5) Tính tổng giá (totalPrice) từ các dịch vụ
+    BigDecimal totalPrice = services.stream()
+            .map(ServiceEntity::getPrice)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    // 6) Map request -> Booking entity
+    Booking booking = bookingMapper.toEntity(request);
     bookingMapper.setUserEntities(booking, customer, specialist);
 
-    // 6) Luôn gán PENDING khi user tạo mới
+    // 7) Gán totalPrice và các thông tin khác
+    booking.setTotalPrice(totalPrice);
     booking.setStatus(BookingStatus.PENDING);
     booking.setCreatedAt(LocalDateTime.now());
     booking.setUpdatedAt(LocalDateTime.now());
 
-    // 7) Lưu
+    // 8) Lưu vào DB và trả về response
     Booking savedBooking = bookingRepository.save(booking);
     return bookingMapper.toResponse(savedBooking);
 }
+
     public BookingResponse updateBooking(Long id, BookingRequest request) {
         Booking existingBooking = bookingRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.BOOKING_NOT_EXISTED));
@@ -224,7 +263,7 @@ public BookingResponse createBooking(BookingRequest request) {
         }
 
         booking.setCheckInTime(LocalDateTime.now());
-        // hoặc booking.setStatus(BookingStatus.IN_PROGRESS);
+        booking.setStatus(BookingStatus.IN_PROGRESS);
 
         booking.setUpdatedAt(LocalDateTime.now());
         bookingRepository.save(booking);

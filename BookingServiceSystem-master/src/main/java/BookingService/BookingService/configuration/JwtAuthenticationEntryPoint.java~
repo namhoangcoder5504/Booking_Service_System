@@ -1,0 +1,4 @@
+package BookingService.BookingService.configuration;
+
+public class JwtAuthenticationEntryPoint {
+}

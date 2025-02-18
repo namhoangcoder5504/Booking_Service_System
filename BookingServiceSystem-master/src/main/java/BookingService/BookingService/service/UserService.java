@@ -60,13 +60,11 @@ public class UserService {
     /**
      * Lấy thông tin user
      */
-    @PostAuthorize("returnObject.username == authentication.name")
     public UserResponse getUser(Long userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
         return userMapper.toUserResponse(user);
     }
-
     /**
      * Chỉ ADMIN mới được lấy danh sách users
      */
